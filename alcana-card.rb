@@ -1,100 +1,207 @@
-# -*- coding: utf-8 -*-
+# coding: utf-8
+# 2015.4.14 re-make version.2
+
+require_relative "./alcana-rules.rb"
+#-----------------------------------------------------------
 
 #
-# AlcanaCard
-# csvファイル カード情報を格納する
+# AlcanaCard: base class
 #
 class AlcanaCard
-  attr_reader :id, :type
-  attr_reader :name, :rarity, :cost, :color
-  attr_reader :tribe, :basebp, :ability
-  attr_accessor :lv, :bp, :tapped, :attackable
-  attr_accessor :status_till_turnend
-  attr_accessor :status_always
-  attr_accessor :status_forever
-  attr_accessor :status_thorough_battle
-  attr_accessor :destructed, :vanished
+  include AlcanaRules
   
-  def initialize(info)
-    # csv記載 ここから
-    @id      = info[0]
-    @type    = info[1]
-    @name    = info[2]
-    @rarity  = info[3]
-    @cost    = info[4].to_i
-    @color   = info[5]
-    @tribe   = info[6]
-    @basebp  = []; 7.upto(9) { |i| @basebp.push(info[i].to_i) }
-    @ability = []; 10.upto(info.length - 1) { |i| @ability.push(info[i]) }
-    # csv記載 ここまで
-    # 以下適宜追加
-    # ユニット/進化ユニットは、手札時点でレベルの概念がある(override)
-    if (@type == 'Unit' || @type == 'Evolve')
-      @lv = 1
-      @bp = @basebp[@lv - 1]
-      @tapped = false
-      if (@type == 'Unit')
-        @attackable = false
-        # 【SpeedMove】は登場時 true、ただし先攻 1turn目のみ false
-      else
-        @attackable = true
-        # ただし先攻 1turnのみ false、進化元が tappedのとき false
-      end
-      # BP変動/追加ability展開 for ユニット
-      # Turn終了まで有効
-      @status_till_turnend = []
-      # 常時有効
-      @status_always = []
-      # 常時有効、かつフィールド判定不要
-      @status_forever = []
-      # 戦闘終了まで有効
-      @status_through_battle = []
-      # 破壊フラグ fieldからtrash移動時に falseに戻す
-      @destructed = false
-    end
-    # 消滅フラグ 本家ではデッキアウト時に復活するが、仕様改変予定
-    @vanished = false
+  def initialize(cardid, cardname)
+    @cardid   = cardid
+    @cardname = cardname
   end
   
+  attr_reader :cardid, :cardname
 end # AlcanaCard
 
 #
-# 複数の csvファイルから一行ずつ card生成する
-# (classでためしたとき、外から各変数が参照できず？、とりあえず moduleにしてみた)
+# SetClockControl: クロックアップ/ダウン、レベル操作
+#                  UnitCard/EvolveCardに適用される
 #
-module CardGenerator
-#  ListName = [
-#    "cardlist_v1_0",
-#    #"cardlist_v1_0_EX",
-#    #"cardlist_v1_1",
-#    #"cardlist_v1_1_EX1",
-#    #"cardlist_v1_1_EX2",
-#    #"cardlist_v1_2",
-#    #"cardlist_v1_2_EX",
-#    #"cardlist_PR",
-#  ]
+module SetClockControl
+  # TODO
+end # SetClockControl
+
+#
+# SetAttrVanish: 消滅操作付与
+#
+module SetAttrVanish
+  attr_reader :vanished
+  
+  def vanish
+    @vanished = true
+  end
+  
+  def unvanish
+    @vanished = false
+  end
+end # SetAttrVanish
+
+
+#-----------------------------------------------------------
+
+#
+# UnitCard < AlcanaCard
+#
+class UnitCard < AlcanaCard
+  include SetClockControl
+  include SetAttrVanish
+  
+  attr_reader :cost, :rality, :color
+  attr_reader :tribe, :level, :basebp, :bptable
+  attr_reader :ability
+  
+  def add_info(unit_info, *ability)
+    @rality   = unit_info[0]
+    @cost     = unit_info[1]
+    @color    = unit_info[2]
+    @tribe    = unit_info[3]
+    @bptable  = unit_info[4]
+    @ability  = ability
+    self.clean_status
+  end
+  
+  def clean_status
+    @level = 1
+    set_basebp
+  end
+  
+  def set_basebp
+    @basebp = @bptable[@level - 1]
+  end
+  
+  def override
+    if @level < UnitLevelLimit
+      @level += 1
+      set_basebp
+    else
+      puts @name + " can't clock-up any more"
+    end
+  end
+  
+  def show_info
+    str  = " CP" + @cost.to_s
+    str += " " + @color
+    str += " " + @cardname
+    str += " LV" + @level.to_s
+    str += " BP" + @basebp.to_s
+    return str
+  end
+end # UnitCard
+
+#
+# EvolveCard < UnitCard (< AlcanaCard)
+#
+class EvloveCard < UnitCard
+end # EvolveCard
+
+#
+# TriggerCard < AlcanaCard
+#
+class TriggerCard < AlcanaCard
+  include SetAttrVanish
+  
+  attr_reader :cost, :rality, :color
+  attr_reader :ability
+  
+  def add_info(trig_info, *ability)
+    @rality  = trig_info[0]
+    @cost    = trig_info[1]
+    @color   = trig_info[2]
+    @ability = ability
+  end
+  
+  def show_info
+    str  = " CP" + @cost.to_s
+    str += " " + @color
+    str += " " + @cardname
+    return str
+  end
+end # TriggerCard
+
+#
+# InterceptCard < AlcanaCard
+#
+class InterceptCard < AlcanaCard
+  include SetAttrVanish
+  
+  attr_reader :cost, :rality, :color
+  attr_reader :ability
+  
+  def add_info(incep_info, *ability)
+    @rality  = incep_info[0]
+    @cost    = incep_info[1]
+    @color   = incep_info[2]
+    @ability = ability
+  end
+  
+  def show_info
+    str  = " CP" + @cost.to_s
+    str += " " + @color
+    str += " " + @cardname
+    return str
+  end
+end # InterceptCard
+
+#
+# JokerCard < AlcanaCard
+#
+
+# TODO
+
+#-----------------------------------------------------------
+
+
+#
+# GenCardList: 使用できるカード一覧の生成
+#
+module GenCardList
   ListName = %w(
     cardlist_v1_0
   )
-    #cardlist_v1_0_EX
     #cardlist_v1_1
-    #cardlist_v1_1_EX1
-    #cardlist_v1_1_EX2
     #cardlist_v1_2
-    #cardlist_v1_2_EX
+    #cardlist_v1_3
     #cardlist_PR
     #cardlist_Joker
-#p ListName
-
+  
   def execute
     cards = []
     ListName.each { |n|
-      open('./cards/'+n+'.csv', encoding:'Shift_JIS:UTF-8') { |f|
+      # 入力ファイルは Shift_JISで保存されている？
+      open("./"+n+".csv", encoding:'Shift_JIS:UTF-8') { |f|
         until !(line = f.gets)
           next if line =~ /^\s*$/
           next if line =~ /^\s*\#/
           info = line.chomp.split(/\s*,\s*/)
-          cards.push(AlcanaCard.new(info))
+          cardid   = info[0]
+          type     = info[1]
+          cardname = info[2]
+          rality   = info[3]
+          cost     = info[4].to_i
+          color    = info[5]
+          tribe    = info[6]
+          bptable  = [info[7].to_i,info[8].to_i,info[9].to_i]
+          card_info = [rality, cost, color, tribe, bptable]
+          ability  = []
+          #ability.push(info[10]~info[end])
+          case type
+          when "Unit"
+            card = UnitCard.new(cardid, cardname)
+          when "Evolve"
+            card = EvloveCard.new(cardid, cardname)
+          when "Trigger"
+            card = TriggerCard.new(cardid, cardname)
+          when "Intercept"
+            card = InterceptCard.new(cardid, cardname)
+          when "Joker"
+          end
+          card.add_info(card_info, ability)
+          cards.push(card)
         end
       }
     }
@@ -102,29 +209,14 @@ module CardGenerator
   end
   
   module_function :execute
-end # CardGenerator
+end # GenCardList
 
-#---------------- tentative check ----------------
-=begin
+#================================ tentative check ================================
+#=begin
 
-cards = []
-open("cardlist_v1_0.csv", encoding: 'Shift_JIS:UTF-8') { |file|
-  until !(line = file.gets)
-    next if line =~ /^\s*$/
-    next if line =~ /^\s*\#/
-    info = line.chomp.split(/\s*,\s*/)
-    cards.push(AlcanaCard.new(info))
-  end
-}
+require "pp"
+cardlist = GenCardList.execute
+#pp cardlist
+cardlist.collect { |c| puts c.show_info }
 
-#p cards
-#cards.collect {|c| p c if c.tribe == "Beast" }
-#cards.collect {|c| p c.name if c.tribe == "獣" }
-#cards.collect {|c| p c if c.tribe == "神" }
-#cards.collect {|c| p c.name if c.tribe == "神" }
-#cards.collect {|c| p c.name if c.color == "Blue" }
-#cards.collect {|c| p c.name if c.type == "Trigger" }
-
-cards.collect {|c| p c.name.to_s }
-
-=end
+#=end
