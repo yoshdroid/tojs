@@ -23,7 +23,27 @@ end # AlcanaCard
 #                  UnitCard/EvolveCardに適用される
 #
 module SetClockControl
-  # TODO
+  def clockup
+    self.override
+  end
+  
+  def clockdown
+    if @level > 1
+      @level -= 1
+      set_basebp
+    else
+      puts @cardname + " is already level 1"
+    end
+  end
+  
+  def setlevel(level)
+    if (1 <= level) && (level <= UnitLevelLimit)
+      @level = level
+      set_basebp
+    else
+      puts "Level " + level.to_s + " is invalid"
+    end
+  end
 end # SetClockControl
 
 #
