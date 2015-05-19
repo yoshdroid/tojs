@@ -116,7 +116,7 @@ end # UnitCard
 #
 # EvolveCard < UnitCard (< AlcanaCard)
 #
-class EvloveCard < UnitCard
+class EvolveCard < UnitCard
 end # EvolveCard
 
 #
@@ -146,6 +146,7 @@ end # TriggerCard
 #
 # InterceptCard < AlcanaCard
 #
+# Triggerとまったく同じなら Trigger継承で充分か
 class InterceptCard < AlcanaCard
   include SetAttrVanish
   
@@ -181,8 +182,9 @@ end # InterceptCard
 #
 module GenCardList
   ListName = %w(
-    cardlist_v1_0
+    debugcards
   )
+    #cardlist_v1_0
     #cardlist_v1_1
     #cardlist_v1_2
     #cardlist_v1_3
@@ -197,10 +199,10 @@ module GenCardList
         until !(line = f.gets)
           next if line =~ /^\s*$/
           next if line =~ /^\s*\#/
-          info = line.chomp.split(/\s*,\s*/)
+          info = line.chomp.split(/\s*,\s*/).shift
           cardid   = info[0]
-          type     = info[1]
-          cardname = info[2]
+          cardname = info[1]
+          type     = info[2]
           rality   = info[3]
           cost     = info[4].to_i
           color    = info[5]
@@ -213,7 +215,7 @@ module GenCardList
           when "Unit"
             card = UnitCard.new(cardid, cardname)
           when "Evolve"
-            card = EvloveCard.new(cardid, cardname)
+            card = EvolveCard.new(cardid, cardname)
           when "Trigger"
             card = TriggerCard.new(cardid, cardname)
           when "Intercept"
